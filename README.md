@@ -1,93 +1,204 @@
-# nnh-backend
+# NNH Backend
 
+REST API for **Nanda Nursing Home** — a full-featured clinic management system built with Spring Boot 3 and Java 21.
 
+---
 
-## Getting started
+## Tech Stack
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+| Layer | Technology |
+|---|---|
+| Runtime | Java 21 |
+| Framework | Spring Boot 3.3.5 |
+| Security | Spring Security 6 · Stateless JWT (JJWT 0.12) |
+| Persistence | Spring Data JPA · Hibernate |
+| Database (dev) | H2 file-backed |
+| Database (prod) | PostgreSQL |
+| Build | Maven |
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+---
 
-## Add your files
+## Features
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+- **Appointments** — public patient booking, staff ad-hoc booking, status lifecycle, full audit trail
+- **Billing** — itemised bills (medicine, room, procedure, other), auto-completes appointment on bill creation
+- **Doctor Absences** — care staff submit requests, admin approves/rejects; approved absences block booking slots
+- **Employees** — `NNHE-xxxxxxx` ID format, role-based access (ADMIN / CARE_STAFF), forced first-login password change, deactivate & permanent delete
+- **Contact** — public contact form submission, admin inbox with READ/RESPONDED status tracking
+- **Auth** — login by email or Employee ID, JWT tokens, change-password endpoint
+
+---
+
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/geberal-group/nnh-backend.git
-git branch -M main
-git push -uf origin main
+src/main/java/com/nnh/backend/
+├── config/          # DataSeeder, CorsConfig
+├── controller/      # REST controllers
+├── dto/
+│   ├── request/     # Incoming request bodies
+│   └── response/    # Outgoing response bodies
+├── exception/       # GlobalExceptionHandler, custom exceptions
+├── orchestration/   # Multi-service coordination layer
+├── persistence/
+│   ├── entity/      # JPA entities
+│   └── repository/  # Spring Data repositories
+├── security/        # JwtUtil, JwtAuthFilter, SecurityConfig
+└── service/         # Business logic
 ```
 
-## Integrate with your tools
+---
 
-* [Set up project integrations](https://gitlab.com/geberal-group/nnh-backend/-/settings/integrations)
+## Getting Started (Local)
 
-## Collaborate with your team
+### Prerequisites
+- Java 21
+- Maven 3.9+
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Run
 
-## Test and Deploy
+```bash
+mvn spring-boot:run
+```
 
-Use the built-in continuous integration in GitLab.
+The API starts on `http://localhost:8080`. H2 console available at `http://localhost:8080/h2-console`.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### Default Seeded Accounts
 
-***
+| Email | Password | Role |
+|---|---|---|
+| `care@nandanursinghome.in` | `Care@NNH2025` | ADMIN |
+| `drvaishnavipurohit@nandanursinghome.in` | `Admin@NNH2025` | ADMIN |
 
-# Editing this README
+> Change both passwords after first login.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+---
 
-## Suggestions for a good README
+## API Reference
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+All responses follow a standard envelope:
+```json
+{ "success": true, "message": "...", "data": { ... } }
+```
 
-## Name
-Choose a self-explaining name for your project.
+### Auth — `/api/auth`
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/login` | Public | Login with email or Employee ID |
+| POST | `/verify` | Bearer | Re-authenticate before sensitive actions |
+| POST | `/change-password` | Bearer | Change own password |
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### Appointments — `/api/appointments`
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/availability` | Public | Check booked slots for a doctor on a date |
+| POST | `/` | Public | Patient self-booking (status: PENDING) |
+| POST | `/staff` | Bearer | Staff ad-hoc booking (status: PENDING) |
+| GET | `/` | Bearer | List all appointments |
+| GET | `/{id}` | Bearer | Get appointment by ID |
+| PATCH | `/{id}/status` | Bearer | Update appointment status |
+| GET | `/{id}/audit` | ADMIN | Full audit history for an appointment |
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+**Appointment Status Lifecycle:**
+```
+PENDING → IN_CONSULTATION → COMPLETED  (auto-set when bill is generated)
+       ↘ CANCELLED
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### Billing — `/api/bills`
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/` | Bearer | Create a bill (auto-completes linked appointment) |
+| GET | `/` | ADMIN | List all bills |
+| GET | `/{id}` | Bearer | Get bill by ID |
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### Doctor Absences — `/api/absences`
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/active` | Public | Approved upcoming absences (used by booking form) |
+| GET | `/` | Bearer | All absence records |
+| POST | `/` | Bearer | Submit absence request (admin = auto-approved) |
+| PATCH | `/{id}/approve` | ADMIN | Approve a pending request |
+| PATCH | `/{id}/reject` | ADMIN | Reject a pending request |
+| DELETE | `/{id}` | ADMIN | Delete an absence record |
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### Employees — `/api/employees`
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/` | ADMIN | List all employees |
+| POST | `/` | ADMIN | Create employee (auto-generates NNHE-ID) |
+| DELETE | `/{id}` | ADMIN | Deactivate employee |
+| DELETE | `/{id}/permanent` | ADMIN | Permanently delete inactive employee |
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+### Contact — `/api/contact`
 
-## License
-For open source projects, say how it is licensed.
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/` | Public | Submit contact form |
+| GET | `/` | ADMIN | List all messages |
+| GET | `/{id}` | ADMIN | Get message by ID |
+| PATCH | `/{id}/status` | ADMIN | Update status (READ / RESPONDED) |
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### Doctors & Services — `/api/doctors`, `/api/services`
+
+Public read-only endpoints used to populate the booking form.
+
+---
+
+## Configuration
+
+### Development (`application.properties`)
+
+Key properties already configured:
+
+```properties
+spring.datasource.url=jdbc:h2:file:./data/nnh-db;AUTO_SERVER=TRUE
+app.jwt.secret=<base64-secret>
+app.cors.allowed-origins=http://localhost:5173,http://localhost:4173
+```
+
+### Production (`application-prod.properties`)
+
+Activated via `SPRING_PROFILES_ACTIVE=prod`. Reads the following environment variables:
+
+| Variable | Description |
+|---|---|
+| `PGHOST` | PostgreSQL host |
+| `PGPORT` | PostgreSQL port |
+| `PGDATABASE` | Database name |
+| `PGUSER` | Database user |
+| `PGPASSWORD` | Database password |
+| `JWT_SECRET` | Base64-encoded HS256 secret (≥ 256 bits) |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins |
+
+---
+
+## Deployment (Railway)
+
+1. Connect your repository to a Railway project
+2. Add a **PostgreSQL** plugin — Railway injects `PG*` env vars automatically
+3. Set the following environment variables in the Railway dashboard:
+
+   | Variable | Value |
+   |---|---|
+   | `SPRING_PROFILES_ACTIVE` | `prod` |
+   | `JWT_SECRET` | *(secure base64 string, ≥ 256 bits)* |
+   | `CORS_ALLOWED_ORIGINS` | `https://your-netlify-site.netlify.app` |
+
+4. Railway builds with Maven and exposes a public HTTPS URL
+5. Set that URL as `VITE_API_URL` in your Netlify environment variables
+
+---
+
+## Security Notes
+
+- JWT tokens expire after 24 hours
+- Passwords are hashed with BCrypt
+- The `care@nandanursinghome.in` account is protected from deactivation and deletion
+- New employees are forced to change their temporary password on first login
+- H2 console is disabled in the production profile
