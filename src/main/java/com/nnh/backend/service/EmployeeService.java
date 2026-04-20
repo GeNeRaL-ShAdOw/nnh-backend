@@ -22,6 +22,7 @@ public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailScenarioService emailScenarioService;
     private final Random random = new Random();
 
     @Transactional(readOnly = true)
@@ -45,7 +46,9 @@ public class EmployeeService {
                 .mustChangePassword(true)
                 .build();
         log.info("Creating employee {} ({}, {})", id, employee.getEmail(), employee.getRole());
-        return toResponse(employeeRepository.save(employee));
+        Employee saved = employeeRepository.save(employee);
+        emailScenarioService.sendNewEmployeeWelcome(saved, req.getPassword());
+        return toResponse(saved);
     }
 
     @Transactional

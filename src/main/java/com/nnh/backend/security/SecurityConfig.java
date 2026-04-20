@@ -57,10 +57,16 @@ public class SecurityConfig {
                         .requestMatchers("/api/absences/*/reject").hasRole("ADMIN")
                         .requestMatchers("/api/appointments/*/audit").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/bills").hasRole("ADMIN")
+                        // Admin-only leave actions
+                        .requestMatchers("/api/leaves/*/approve").hasRole("ADMIN")
+                        .requestMatchers("/api/leaves/*/reject").hasRole("ADMIN")
                         // Authenticated staff
                         .requestMatchers(HttpMethod.POST, "/api/appointments/staff").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/absences").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/absences").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/leaves").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/leaves/approved").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/leaves").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/bills").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/bills/**").authenticated()
                         // Everything else requires a valid token
