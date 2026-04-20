@@ -4,9 +4,12 @@ import com.nnh.backend.dto.request.AbsenceRequest;
 import com.nnh.backend.dto.response.AbsenceResponse;
 import com.nnh.backend.exception.ResourceNotFoundException;
 import com.nnh.backend.persistence.entity.AbsenceStatus;
+import com.nnh.backend.persistence.entity.Appointment;
+import com.nnh.backend.persistence.entity.AppointmentStatus;
 import com.nnh.backend.persistence.entity.DoctorAbsence;
 import com.nnh.backend.persistence.entity.Employee;
 import com.nnh.backend.persistence.entity.EmployeeRole;
+import com.nnh.backend.persistence.repository.AppointmentRepository;
 import com.nnh.backend.persistence.repository.DoctorAbsenceRepository;
 import com.nnh.backend.persistence.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ public class DoctorAbsenceService {
 
     private final DoctorAbsenceRepository absenceRepository;
     private final EmployeeRepository employeeRepository;
+    private final AppointmentRepository appointmentRepository;
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy");
 
@@ -76,7 +80,13 @@ public class DoctorAbsenceService {
 
         log.info("Absence request for {} from {} to {} by {} (status: {})",
                 req.getDoctorId(), req.getStartDate(), req.getEndDate(), creatorEmail, initialStatus);
-        return toResponse(absenceRepository.save(absence));
+        DoctorAbsence saved = absenceRepository.save(absence);
+
+        if (initialStatus == AbsenceStatus.APPROVED) {
+            rescheduleAppointments(req.getDoctorId(), req.getStartDate(), req.getEndDate());
+        }
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -109,6 +119,29 @@ public class DoctorAbsenceService {
         }
         absenceRepository.deleteById(id);
         log.info("Deleted absence record {}", id);
+    }
+
+    private void rescheduleAppointments(String doctorId, LocalDate absenceStart, LocalDate absenceEnd) {
+        List<Appointment> affected = appointmentRepository
+                .findByDoctor_IdAndAppointmentDateBetweenAndStatusIn(
+                        doctorId, absenceStart, absenceEnd,
+                        List.of(AppointmentStatus.PENDING, AppointmentStatus.IN_CONSULTATION));
+
+        if (affected.isEmpty()) return;
+        log.info("Rescheduling {} appointment(s) due to absence of {}", affected.size(), doctorId);
+
+        LocalDate candidate = absenceEnd.plusDays(1);
+        for (Appointment appt : affected) {
+            // Find the first date from candidate onwards where this time slot is free
+            LocalDate newDate = candidate;
+            while (appointmentRepository.existsByDoctor_IdAndAppointmentDateAndAppointmentTime(
+                    doctorId, newDate, appt.getAppointmentTime())) {
+                newDate = newDate.plusDays(1);
+            }
+            log.info("Rescheduling appointment {} from {} to {}", appt.getId(), appt.getAppointmentDate(), newDate);
+            appt.setAppointmentDate(newDate);
+            appointmentRepository.save(appt);
+        }
     }
 
     private AbsenceResponse toResponse(DoctorAbsence a) {
