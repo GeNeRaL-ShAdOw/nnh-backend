@@ -37,7 +37,7 @@ public class EmployeeController {
     public ResponseEntity<ApiResponse<EmployeeResponse>> create(
             @Valid @RequestBody CreateEmployeeRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Employee created", employeeService.create(req)));
+                .body(ApiResponse.success("Employee created", employeeService.createAndNotify(req)));
     }
 
     @PutMapping("/{id}")
