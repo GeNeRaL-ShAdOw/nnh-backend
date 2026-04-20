@@ -46,9 +46,18 @@ public class EmployeeService {
                 .mustChangePassword(true)
                 .build();
         log.info("Creating employee {} ({}, {})", id, employee.getEmail(), employee.getRole());
-        Employee saved = employeeRepository.save(employee);
-        emailScenarioService.sendNewEmployeeWelcome(saved, req.getPassword());
-        return toResponse(saved);
+        return toResponse(employeeRepository.save(employee));
+    }
+
+    public EmployeeResponse createAndNotify(CreateEmployeeRequest req) {
+        EmployeeResponse response = create(req);
+        try {
+            Employee saved = employeeRepository.findById(response.getId()).orElseThrow();
+            emailScenarioService.sendNewEmployeeWelcome(saved, req.getPassword());
+        } catch (Exception e) {
+            log.error("Welcome email failed for employee {}: {}", response.getId(), e.getMessage());
+        }
+        return response;
     }
 
     @Transactional
